@@ -181,15 +181,31 @@ public class Program
     public string channelShipCommands;
 
     public static string channelName;
-    
+    public static string publishChannel;
+    public static string subscribeChannel;
+
 
     public static void Main()
     {
         shipInfo shipInfoMaster = new shipInfo();
+        Console.WriteLine(" ______ _____     _____ _     _                          _     _              _    ");
+        Console.WriteLine("|  ____|  __ \\   / ____| |   (_)           /\\           (_)   | |            | |   ");
+        Console.WriteLine("| |__  | |  | | | (___ | |__  _ _ __      /  \\   ___ ___ _ ___| |_ __ _ _ __ | |_  ");
+        Console.WriteLine("|  __| | |  | |  \\___ \\| '_ \\| | '_ \\    / /\\ \\ / __/ __| / __| __/ _` | '_ \\| __| ");
+        Console.WriteLine("| |____| |__| |  ____) | | | | | |_) |  / ____ \\\\__ \\__ \\ \\__ \\ || (_| | | | | |_  ");
+        Console.WriteLine("|______|_____/  |_____/|_| |_|_| .__/  /_/    \\_\\___/___/_|___/\\__\\__,_|_| |_|\\__|");
+        Console.WriteLine("                               | |                                                 ");
+        Console.WriteLine("                               |_|                                                ");
 
-        Console.WriteLine("Please enter your session ID: ");
+        Console.WriteLine();
+
+        Console.Write("Please enter your session ID: ");
 
         channelName = Console.ReadLine();
+
+        Console.WriteLine();
+
+
 
         pubnubToAlexa.EnableResumeOnReconnect = true;
         pubnubFromAlexa.EnableResumeOnReconnect = true;
@@ -234,15 +250,8 @@ public class Program
 
         File.WriteAllText(pathDoc + "\\commandsTo.json", "");
 
-        string publishChannel = channelName + "A";
-        string subscribeChannel = channelName + "B";
-
-        //pubnubToAlexa.Subscribe<string>(
-        //publishChannel,
-        //HandleChangedLinesShip,
-        //DisplaySubscribeConnectStatusMessage,
-        //DisplayErrorMessage
-        //);
+        publishChannel = channelName + "A";
+        subscribeChannel = channelName + "B";
 
         pubnubFromAlexa.Subscribe<string>(
            subscribeChannel,
@@ -280,30 +289,7 @@ public class Program
                         _continuousFileReaderShip = new AddedContentReader(Path.Combine(backupDir, "working.log"));
                     }
 
-                    /*try
-                    {
-                        File.Copy(Path.Combine(pathDoc, "commandsTo.json"), Path.Combine(pathDoc, "commandsRead.json"), true);
-                    } catch
-                    {
-
-                    }
-
-                    try
-                    {
-                        if (_continuousFileReaderCommands == null)
-                        {
-                            _continuousFileReaderCommands = new AddedContentReader(Path.Combine(pathDoc, "commandsRead.json"));
-                        }
-                    }
-                    catch
-                    {
-
-                    }*/
-
-                    
-
                     HandleChangedLinesShip(shipInfoMaster);
-                    //HandleRecieveCommands();
                     loop = 0;
                 }
                 catch
@@ -1607,7 +1593,7 @@ public class Program
                         if (type == 1)
                         {
                             eventName = check2;
-                            Console.WriteLine(eventName);
+                            //Console.WriteLine(eventName);
                             type = 0;
                         }
 
@@ -1649,7 +1635,7 @@ public class Program
                 }
                 
                 
-                Console.WriteLine("");
+                //Console.WriteLine("");
                 string path = Directory.GetParent(Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData)).FullName;
                 if (Environment.OSVersion.Version.Major >= 6)
                 {
@@ -1673,13 +1659,18 @@ public class Program
                         {
                             Array.Resize(ref universalContent, i + 1);
                             universalContent[i] = Convert.ToInt32(eventContent[i]);
-                            Console.WriteLine("{0}: {1}", eventContentAttributes[i], universalContent[i]);
+                            //Console.WriteLine("{0}: {1}", eventContentAttributes[i], universalContent[i]);
                         }
                         //This is where event attributes are built using the predefined object
                         shipInfoMaster.Rank.rank(universalContent[0], universalContent[1], universalContent[2], universalContent[3], universalContent[4], universalContent[5]);
 
                         var json = new JavaScriptSerializer().Serialize(shipInfoMaster);
-                        File.WriteAllText(Path.Combine(pathTest, "shipData.json"), json);
+                        pubnubToAlexa.Publish<string>(
+                            publishChannel,
+                            json,
+                            DisplayReturnMessage,
+                            DisplayErrorMessage
+                        );
                     }
                 }
                 else if (eventName == "Progress")
@@ -1693,13 +1684,18 @@ public class Program
                         {
                             Array.Resize(ref universalContent, i + 1);
                             universalContent[i] = Convert.ToInt32(eventContent[i]);
-                            Console.WriteLine("{0}: {1}", eventContentAttributes[i], universalContent[i]);
+                            //Console.WriteLine("{0}: {1}", eventContentAttributes[i], universalContent[i]);
                         }
                         //This is where event attributes are built using the predefined object
                         shipInfoMaster.Progress.progress(universalContent[0], universalContent[1], universalContent[2], universalContent[3], universalContent[4], universalContent[5]);
 
                         var json = new JavaScriptSerializer().Serialize(shipInfoMaster);
-                        File.WriteAllText(Path.Combine(pathTest, "shipData.json"), json);
+                        pubnubToAlexa.Publish<string>(
+                            publishChannel,
+                            json,
+                            DisplayReturnMessage,
+                            DisplayErrorMessage
+                        );
                     }
                 }
                 else if (eventName == "Docked")
@@ -1713,13 +1709,18 @@ public class Program
                         {
                             Array.Resize(ref universalContent, i + 1);
                             universalContent[i] = eventContent[i];
-                            Console.WriteLine("{0}: {1}", eventContentAttributes[i], universalContent[i]);
+                            //Console.WriteLine("{0}: {1}", eventContentAttributes[i], universalContent[i]);
                         }
                         //This is where event attributes are built using the predefined object
                         shipInfoMaster.Docked.docked(true, universalContent[0]);
 
                         var json = new JavaScriptSerializer().Serialize(shipInfoMaster);
-                        File.WriteAllText(Path.Combine(pathTest, "shipData.json"), json);
+                        pubnubToAlexa.Publish<string>(
+                            publishChannel,
+                            json,
+                            DisplayReturnMessage,
+                            DisplayErrorMessage
+                        );
                     }
                 }
                 else if (eventName == "Undocked")
@@ -1733,13 +1734,18 @@ public class Program
                         {
                             Array.Resize(ref universalContent, i + 1);
                             universalContent[i] = eventContent[i];
-                            Console.WriteLine("{0}: {1}", eventContentAttributes[i], universalContent[i]);
+                            //Console.WriteLine("{0}: {1}", eventContentAttributes[i], universalContent[i]);
                         }
                         //This is where event attributes are built using the predefined object
                         shipInfoMaster.Docked.docked(false, "");
 
                         var json = new JavaScriptSerializer().Serialize(shipInfoMaster);
-                        File.WriteAllText(Path.Combine(pathTest, "shipData.json"), json);
+                        pubnubToAlexa.Publish<string>(
+                            publishChannel,
+                            json,
+                            DisplayReturnMessage,
+                            DisplayErrorMessage
+                        );
                     }
                 }
                 else if (eventName == "Location")
@@ -1754,7 +1760,7 @@ public class Program
                         {
                             Array.Resize(ref universalContent, i + 1);
                             universalContent[i] = eventContent[i];
-                            Console.WriteLine("{0}: {1}", eventContentAttributes[i], universalContent[i]);
+                            //Console.WriteLine("{0}: {1}", eventContentAttributes[i], universalContent[i]);
                             if(eventContentAttributes[i] == "Docked" && universalContent[i] == "True")
                             {
                                 dockTrue = true;
@@ -1773,7 +1779,12 @@ public class Program
                         
 
                         var json = new JavaScriptSerializer().Serialize(shipInfoMaster);
-                        File.WriteAllText(Path.Combine(pathTest, "shipData.json"), json);
+                        pubnubToAlexa.Publish<string>(
+                            publishChannel,
+                            json,
+                            DisplayReturnMessage,
+                            DisplayErrorMessage
+                        );
                     }
                 }
                 else if (eventName == "FSDJump" || eventName == "SupercruiseEntry")
@@ -1787,13 +1798,18 @@ public class Program
                         {
                             Array.Resize(ref universalContent, i + 1);
                             universalContent[i] = eventContent[i];
-                            Console.WriteLine("{0}: {1}", eventContentAttributes[i], universalContent[i]);
+                            //Console.WriteLine("{0}: {1}", eventContentAttributes[i], universalContent[i]);
                         }
                         //This is where event attributes are built using the predefined object
                         shipInfoMaster.Location.location(universalContent[0], "");
 
                         var json = new JavaScriptSerializer().Serialize(shipInfoMaster);
-                        File.WriteAllText(Path.Combine(pathTest, "shipData.json"), json);
+                        pubnubToAlexa.Publish<string>(
+                            publishChannel,
+                            json,
+                            DisplayReturnMessage,
+                            DisplayErrorMessage
+                        );
                     }
                 }
                 else if (eventName == "SupercruiseExit")
@@ -1807,13 +1823,18 @@ public class Program
                         {
                             Array.Resize(ref universalContent, i + 1);
                             universalContent[i] = eventContent[i];
-                            Console.WriteLine("{0}: {1}", eventContentAttributes[i], universalContent[i]);
+                            //Console.WriteLine("{0}: {1}", eventContentAttributes[i], universalContent[i]);
                         }
                         //This is where event attributes are built using the predefined object
                         shipInfoMaster.Location.location(universalContent[0], universalContent[1]);
 
                         var json = new JavaScriptSerializer().Serialize(shipInfoMaster);
-                        File.WriteAllText(Path.Combine(pathTest, "shipData.json"), json);
+                        pubnubToAlexa.Publish<string>(
+                            publishChannel,
+                            json,
+                            DisplayReturnMessage,
+                            DisplayErrorMessage
+                        );
                     }
                 }
                 else if (eventName == "Touchdown")
@@ -1827,13 +1848,18 @@ public class Program
                         {
                             Array.Resize(ref universalContent, i + 1);
                             universalContent[i] = eventContent[i];
-                            Console.WriteLine("{0}: {1}", eventContentAttributes[i], universalContent[i]);
+                            //Console.WriteLine("{0}: {1}", eventContentAttributes[i], universalContent[i]);
                         }
                         //This is where event attributes are built using the predefined object
                         shipInfoMaster.Touchdown.touchdown(true);
 
                         var json = new JavaScriptSerializer().Serialize(shipInfoMaster);
-                        File.WriteAllText(Path.Combine(pathTest, "shipData.json"), json);
+                        pubnubToAlexa.Publish<string>(
+                            publishChannel,
+                            json,
+                            DisplayReturnMessage,
+                            DisplayErrorMessage
+                        );
                     }
                 }
                 else if (eventName == "Liftoff")
@@ -1847,13 +1873,18 @@ public class Program
                         {
                             Array.Resize(ref universalContent, i + 1);
                             universalContent[i] = eventContent[i];
-                            Console.WriteLine("{0}: {1}", eventContentAttributes[i], universalContent[i]);
+                            //Console.WriteLine("{0}: {1}", eventContentAttributes[i], universalContent[i]);
                         }
                         //This is where event attributes are built using the predefined object
                         shipInfoMaster.Touchdown.touchdown(false);
 
                         var json = new JavaScriptSerializer().Serialize(shipInfoMaster);
-                        File.WriteAllText(Path.Combine(pathTest, "shipData.json"), json);
+                        pubnubToAlexa.Publish<string>(
+                            publishChannel,
+                            json,
+                            DisplayReturnMessage,
+                            DisplayErrorMessage
+                        );
                     }
                 }
                 else if (eventName == "HullDamage")
@@ -1867,13 +1898,18 @@ public class Program
                         {
                             Array.Resize(ref universalContent, i + 1);
                             universalContent[i] = eventContent[i];
-                            Console.WriteLine("{0}: {1}", eventContentAttributes[i], universalContent[i]);
+                            //Console.WriteLine("{0}: {1}", eventContentAttributes[i], universalContent[i]);
                         }
                         //This is where event attributes are built using the predefined object
                         shipInfoMaster.HullDamage.hulldamage(Convert.ToDouble(universalContent[1]));
 
                         var json = new JavaScriptSerializer().Serialize(shipInfoMaster);
-                        File.WriteAllText(Path.Combine(pathTest, "shipData.json"), json);
+                        pubnubToAlexa.Publish<string>(
+                            publishChannel,
+                            json,
+                            DisplayReturnMessage,
+                            DisplayErrorMessage
+                        );
                     }
                 }
                 else if (eventName == "ShieldState")
@@ -1887,13 +1923,18 @@ public class Program
                         {
                             Array.Resize(ref universalContent, i + 1);
                             universalContent[i] = eventContent[i];
-                            Console.WriteLine("{0}: {1}", eventContentAttributes[i], universalContent[i]);
+                            //Console.WriteLine("{0}: {1}", eventContentAttributes[i], universalContent[i]);
                         }
                         //This is where event attributes are built using the predefined object
                         shipInfoMaster.ShieldState.shieldstate(Convert.ToBoolean(universalContent[0]));
 
                         var json = new JavaScriptSerializer().Serialize(shipInfoMaster);
-                        File.WriteAllText(Path.Combine(pathTest, "shipData.json"), json);
+                        pubnubToAlexa.Publish<string>(
+                            publishChannel,
+                            json,
+                            DisplayReturnMessage,
+                            DisplayErrorMessage
+                        );
                     }
                 }
                 else if (eventName == "PVPKill")
@@ -1907,13 +1948,18 @@ public class Program
                         {
                             Array.Resize(ref universalContent, i + 1);
                             universalContent[i] = eventContent[i];
-                            Console.WriteLine("{0}: {1}", eventContentAttributes[i], universalContent[i]);
+                            //Console.WriteLine("{0}: {1}", eventContentAttributes[i], universalContent[i]);
                         }
                         //This is where event attributes are built using the predefined object
                         shipInfoMaster.PVPKill.pvpkill(universalContent[0]);
 
                         var json = new JavaScriptSerializer().Serialize(shipInfoMaster);
-                        File.WriteAllText(Path.Combine(pathTest, "shipData.json"), json);
+                        pubnubToAlexa.Publish<string>(
+                            publishChannel,
+                            json,
+                            DisplayReturnMessage,
+                            DisplayErrorMessage
+                        );
                     }
                 }
                 else if (eventName == "DatalinkScan")
@@ -1927,13 +1973,18 @@ public class Program
                         {
                             Array.Resize(ref universalContent, i + 1);
                             universalContent[i] = eventContent[i];
-                            Console.WriteLine("{0}: {1}", eventContentAttributes[i], universalContent[i]);
+                            //Console.WriteLine("{0}: {1}", eventContentAttributes[i], universalContent[i]);
                         }
                         //This is where event attributes are built using the predefined object
                         shipInfoMaster.DataLinkScan.datalinkscan(universalContent[0]);
 
                         var json = new JavaScriptSerializer().Serialize(shipInfoMaster);
-                        File.WriteAllText(Path.Combine(pathTest, "shipData.json"), json);
+                        pubnubToAlexa.Publish<string>(
+                            publishChannel,
+                            json,
+                            DisplayReturnMessage,
+                            DisplayErrorMessage
+                        );
                     }
                 }
                 else if (eventName == "ReceiveText")
@@ -1947,19 +1998,24 @@ public class Program
                         {
                             Array.Resize(ref universalContent, i + 1);
                             universalContent[i] = eventContent[i];
-                            Console.WriteLine("{0}: {1}", eventContentAttributes[i], universalContent[i]);
+                            //Console.WriteLine("{0}: {1}", eventContentAttributes[i], universalContent[i]);
                         }
                         //This is where event attributes are built using the predefined object
                         shipInfoMaster.RecieveText.recievetext(universalContent[3], universalContent[1]);
 
                         var json = new JavaScriptSerializer().Serialize(shipInfoMaster);
-                        File.WriteAllText(Path.Combine(pathTest, "shipData.json"), json);
+                        pubnubToAlexa.Publish<string>(
+                            publishChannel,
+                            json,
+                            DisplayReturnMessage,
+                            DisplayErrorMessage
+                        );
                     }
                 }
                 
-                Console.WriteLine("");
-                Console.WriteLine("EVENT DONE");
-                Console.WriteLine("");
+                //Console.WriteLine("");
+                //Console.WriteLine("EVENT DONE");
+                //Console.WriteLine("");
             }
         }
     } //Handles the ship info update when new event is logged
@@ -2002,12 +2058,22 @@ public class Program
 
     public static void DisplaySubscribeConnectStatusMessage(string result)
     {
-
+        Console.WriteLine();
+        Console.WriteLine("CONNECTED");
+        Console.WriteLine("Ready for Commands. Please make sure Elite: Dangerous is running. Enjoy!");
+        Console.WriteLine();
+        //Console.WriteLine(result);
     }
 
     public static void DisplayErrorMessage(PubnubClientError pubnubError)
     {
 
+    }
+
+    public static void DisplayReturnMessage(string result)
+    {
+        //Console.WriteLine("PUBLISH STATUS CALLBACK");
+        //Console.WriteLine(result);
     }
 
 }

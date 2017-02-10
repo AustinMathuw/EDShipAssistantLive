@@ -55,14 +55,14 @@
     </dependentAssembly>
   </dependency>
   <dependency>
-    <dependentAssembly dependencyType="install" allowDelayedBinding="true" codebase="Elite Dangerous Alexa AI.exe" size="117216">
+    <dependentAssembly dependencyType="install" allowDelayedBinding="true" codebase="Elite Dangerous Alexa AI.exe" size="116704">
       <assemblyIdentity name="Elite Dangerous Alexa AI" version="1.0.0.0" language="neutral" processorArchitecture="msil" />
       <hash>
         <dsig:Transforms>
           <dsig:Transform Algorithm="urn:schemas-microsoft-com:HashTransforms.Identity" />
         </dsig:Transforms>
         <dsig:DigestMethod Algorithm="http://www.w3.org/2000/09/xmldsig#sha256" />
-        <dsig:DigestValue>TI7OxXdcI1eddUhbBxe7duY4Bu2DMdeTBLXG+e4n4KU=</dsig:DigestValue>
+        <dsig:DigestValue>nXXRAs9XNtj8MHcDwz5zxbBg/ZsVTJDPLoOjrHX4Lz4=</dsig:DigestValue>
       </hash>
     </dependentAssembly>
   </dependency>
