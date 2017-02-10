@@ -1,1 +1,1 @@
-C:\Users\sirau\Source\Repos\EDShipAssistantLive\ComputerApp\Advanced Install\PubnubWindowsStore\PubnubWindowsStore.csproj;x86
+C:\Users\Comsat Architects\Source\Repos\EDShipAssistantLive\ComputerApp\Advanced Install\PubnubWindowsStore\PubnubWindowsStore.csproj;x86

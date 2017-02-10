@@ -19,6 +19,11 @@ using InputManager;
 
 public class Program
 {
+    static public Pubnub pubnubToAlexa = new Pubnub("pub-c-06cf8ccb-5bf9-4a97-aca2-3a5eb322dd92", "sub-c-2955e8f4-c6c7-11e6-b8a7-0619f8945a4f", "", "", true); //Initialize PubNub
+    
+    static public Pubnub pubnubFromAlexa = new Pubnub("pub-c-18a081e9-f557-4146-b7d3-7847a67dfbaa", "sub-c-367dd992-c6c7-11e6-8164-0619f8945a4f", "", "", true); //Initialize PubNub
+    
+
     [DllImport("User32.dll")]
     static extern int SetForegroundWindow(IntPtr point);
     public class shipInfo
@@ -37,11 +42,6 @@ public class Program
         public Chaff Chaff = new Chaff();
         public Scoop Scoop = new Scoop();
     } //Difines the ship info
-
-    public class shipCommands
-    {
-        public string command { get; set; }
-    } //Difines the commands
 
     public class Rank
     {
@@ -177,26 +177,32 @@ public class Program
     }
 
     private static AddedContentReader _continuousFileReaderShip = null;
-    private static AddedContentReader _continuousFileReaderCommands = null;
 
     public string channelShipCommands;
+
+    public static string channelName;
     
 
     public static void Main()
     {
         shipInfo shipInfoMaster = new shipInfo();
-        shipCommands shipCommandsMaster = new shipCommands();
-        
-        Run(shipInfoMaster, shipCommandsMaster);
+
+        Console.WriteLine("Please enter your session ID: ");
+
+        channelName = Console.ReadLine();
+
+        pubnubToAlexa.EnableResumeOnReconnect = true;
+        pubnubFromAlexa.EnableResumeOnReconnect = true;
+
+        Run(shipInfoMaster);
 
     } //Main loop
 
     
 
     [PermissionSet(SecurityAction.Demand, Name = "FullTrust")]
-    public static void Run(shipInfo shipInfoMaster, shipCommands shipCommandsMaster)
+    public static void Run(shipInfo shipInfoMaster)
     {
-        shipCommandsMaster.command = "";
         shipInfoMaster.Rank.rank(0, 0, 0, 0, 0, 0);
         shipInfoMaster.Progress.progress(0, 0, 0, 0, 0, 0);
         shipInfoMaster.Docked.docked(false, "");
@@ -228,6 +234,23 @@ public class Program
 
         File.WriteAllText(pathDoc + "\\commandsTo.json", "");
 
+        string publishChannel = channelName + "A";
+        string subscribeChannel = channelName + "B";
+
+        //pubnubToAlexa.Subscribe<string>(
+        //publishChannel,
+        //HandleChangedLinesShip,
+        //DisplaySubscribeConnectStatusMessage,
+        //DisplayErrorMessage
+        //);
+
+        pubnubFromAlexa.Subscribe<string>(
+           subscribeChannel,
+            HandleRecieveCommands,
+            DisplaySubscribeConnectStatusMessage,
+            DisplayErrorMessage
+        );
+
         // This will exit automatically if main window closes 
         // due to thread being in the background
         long lastUpdate = 0;
@@ -257,7 +280,7 @@ public class Program
                         _continuousFileReaderShip = new AddedContentReader(Path.Combine(backupDir, "working.log"));
                     }
 
-                    try
+                    /*try
                     {
                         File.Copy(Path.Combine(pathDoc, "commandsTo.json"), Path.Combine(pathDoc, "commandsRead.json"), true);
                     } catch
@@ -275,10 +298,12 @@ public class Program
                     catch
                     {
 
-                    }
+                    }*/
+
                     
+
                     HandleChangedLinesShip(shipInfoMaster);
-                    HandleRecieveCommands(shipCommandsMaster);
+                    //HandleRecieveCommands();
                     loop = 0;
                 }
                 catch
@@ -295,465 +320,405 @@ public class Program
         };
     }
 
-    private static void HandleRecieveCommands(shipCommands shipCommandsMaster)
+    private static void HandleRecieveCommands(string commandRawJSON)
     {
-        if (_continuousFileReaderCommands != null && _continuousFileReaderCommands.NewDataReady())
+        if (!string.IsNullOrEmpty(commandRawJSON) && !string.IsNullOrEmpty(commandRawJSON.Trim()))
         {
-            // Specify what is done when a file is changed, created, or deleted.
-            string newLines = _continuousFileReaderCommands.GetAddedLine();
-            if (newLines != null && newLines.Length > 0)
+            List<object> deserializedMessage = pubnubFromAlexa.JsonPluggableLibrary.DeserializeToListOfObject(commandRawJSON);
+            if (deserializedMessage != null && deserializedMessage.Count > 0)
             {
-                
-                
+                object subscribedObject = (object)deserializedMessage[0];
 
-                string path = Directory.GetParent(Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData)).FullName;
-                if (Environment.OSVersion.Version.Major >= 6)
+                if (subscribedObject != null)
                 {
-                    path = Directory.GetParent(path).ToString();
-                }
-                string pathDoc = path + "\\Documents\\Elite Dangerous Ship Assistant";
-                if (!Directory.Exists(pathDoc))
-                {
-                    Directory.CreateDirectory(pathDoc);
-
-                }
-                ///See http://www.newtonsoft.com/json/help/html/ReadingWritingJSON.htm
-                ///
-
-                
-
-                //string fileinfo = File.ReadAllText(Path.Combine(pathDoc, "commandsRead.json"));
-                //Console.WriteLine(fileinfo);
-
-                JsonTextReader reader = new JsonTextReader(new StringReader(newLines));
-
-                string commandName = "";
-                string oldTime = "";
-                string token = "";
-                int test = 0;
-
-                while (reader.Read())
-                {
-
-                    if (reader.Value != null)
+                    string resultActualMessage = pubnubFromAlexa.JsonPluggableLibrary.SerializeToJsonString(subscribedObject);
+                    string command = resultActualMessage; //Format is "{\"command\":\"deployLandingGear\"}"
+                    if (command == "{\"command\":\"boost\"}")
                     {
-                        token = Convert.ToString(reader.TokenType);
-                        commandName = Convert.ToString(reader.Value);
 
-                        if (test == 2)
-                        {
-                            if(commandName != oldTime)
-                            {
-                                if (shipCommandsMaster.command == "boost")
-                                {
+                        Console.BackgroundColor = ConsoleColor.DarkGreen;
+                        Console.WriteLine("boost");
+                        Console.ResetColor();
+                        Task.Run(() => boost());
+                    }
+                    else if (command == "{\"command\":\"balencePower\"}")
+                    {
+                        Console.BackgroundColor = ConsoleColor.DarkGreen;
+                        Console.WriteLine("balencePower");
+                        Console.ResetColor();
+                        Task.Run(() => balencePower());
 
-                                    Console.BackgroundColor = ConsoleColor.DarkGreen;
-                                    Console.WriteLine("boost");
-                                    Console.ResetColor();
-                                    Task.Run(() => boost());
-                                }
-                                else if (shipCommandsMaster.command == "balencePower")
-                                {
-                                    Console.BackgroundColor = ConsoleColor.DarkGreen;
-                                    Console.WriteLine("balencePower");
-                                    Console.ResetColor();
-                                    Task.Run(() => balencePower());
+                    }
+                    else if (command == "{\"command\":\"cancelDocking\"}")
+                    {
+                        Console.BackgroundColor = ConsoleColor.DarkGreen;
+                        Console.WriteLine("cancelDocking");
+                        Console.ResetColor();
+                        Task.Run(() => cancelDocking());
 
-                                }
-                                else if (shipCommandsMaster.command == "cancelDocking")
-                                {
-                                    Console.BackgroundColor = ConsoleColor.DarkGreen;
-                                    Console.WriteLine("cancelDocking");
-                                    Console.ResetColor();
-                                    Task.Run(() => cancelDocking());
-
-                                }
-                                else if (shipCommandsMaster.command == "deployChaff")
-                                {
-                                    Console.BackgroundColor = ConsoleColor.DarkGreen;
-                                    Console.WriteLine("deployChaff");
-                                    Console.ResetColor();
-                                    Task.Run(() => deployChaff());
-                                }
-                                else if (shipCommandsMaster.command == "deployHardpoints")
-                                {
-                                    Console.BackgroundColor = ConsoleColor.DarkGreen;
-                                    Console.WriteLine("deployHardpoints");
-                                    Console.ResetColor();
-                                    Task.Run(() => deployHardpoints());
-                                }
-                                else if (shipCommandsMaster.command == "deployLandingGear")
-                                {
-                                    Console.BackgroundColor = ConsoleColor.DarkGreen;
-                                    Console.WriteLine("deployLandingGear");
-                                    Console.ResetColor();
-                                    Task.Run(() => deployLandingGear());
-                                }
-                                else if (shipCommandsMaster.command == "deployCargoScoop")
-                                {
-                                    Console.BackgroundColor = ConsoleColor.DarkGreen;
-                                    Console.WriteLine("deployCargoScoop");
-                                    Console.ResetColor();
-                                    Task.Run(() => deployCargoScoop());
-                                }
-                                else if (shipCommandsMaster.command == "deploySRV")
-                                {
-                                    Console.BackgroundColor = ConsoleColor.DarkGreen;
-                                    Console.WriteLine("deploySRV");
-                                    Console.ResetColor();
-                                    Task.Run(() => deploySRV());
-                                }
-                                else if (shipCommandsMaster.command == "exitFramshift")
-                                {
-                                    Console.BackgroundColor = ConsoleColor.DarkGreen;
-                                    Console.WriteLine("exitFramshift");
-                                    Console.ResetColor();
-                                    Task.Run(() => exitFramshift());
-                                }
-                                else if (shipCommandsMaster.command == "exitCruise")
-                                {
-                                    Console.BackgroundColor = ConsoleColor.DarkGreen;
-                                    Console.WriteLine("exitCruise");
-                                    Console.ResetColor();
-                                    Task.Run(() => exitCruise());
-                                }
-                                else if (shipCommandsMaster.command == "powerToEngines")
-                                {
-                                    Console.BackgroundColor = ConsoleColor.DarkGreen;
-                                    Console.WriteLine("powerToEngines");
-                                    Console.ResetColor();
-                                    Task.Run(() => powerToEngines());
-                                }
-                                else if (shipCommandsMaster.command == "powerToSystems")
-                                {
-                                    Console.BackgroundColor = ConsoleColor.DarkGreen;
-                                    Console.WriteLine("powerToSystems");
-                                    Console.ResetColor();
-                                    Task.Run(() => powerToSystems());
-                                }
-                                else if (shipCommandsMaster.command == "powerToWeapons")
-                                {
-                                    Console.BackgroundColor = ConsoleColor.DarkGreen;
-                                    Console.WriteLine("powerToWeapons");
-                                    Console.ResetColor();
-                                    Task.Run(() => powerToWeapons());
-                                }
-                                else if (shipCommandsMaster.command == "emergencyStop")
-                                {
-                                    Console.BackgroundColor = ConsoleColor.DarkGreen;
-                                    Console.WriteLine("emergencyStop");
-                                    Console.ResetColor();
-                                    Task.Run(() => emergencyStop());
-                                }
-                                else if (shipCommandsMaster.command == "engageFrameshift")
-                                {
-                                    Console.BackgroundColor = ConsoleColor.DarkGreen;
-                                    Console.WriteLine("engageFrameshift");
-                                    Console.ResetColor();
-                                    Task.Run(() => engageFrameshift());
-                                }
-                                else if (shipCommandsMaster.command == "engageCruise")
-                                {
-                                    Console.BackgroundColor = ConsoleColor.DarkGreen;
-                                    Console.WriteLine("engageCruise");
-                                    Console.ResetColor();
-                                    Task.Run(() => engageCruise());
-                                }
-                                else if (shipCommandsMaster.command == "fightAssistOff")
-                                {
-                                    Console.BackgroundColor = ConsoleColor.DarkGreen;
-                                    Console.WriteLine("fightAssistOff");
-                                    Console.ResetColor();
-                                    Task.Run(() => fightAssistOff());
-                                }
-                                else if (shipCommandsMaster.command == "fightAssistOn")
-                                {
-                                    Console.BackgroundColor = ConsoleColor.DarkGreen;
-                                    Console.WriteLine("fightAssistOn");
-                                    Console.ResetColor();
-                                    Task.Run(() => fightAssistOn());
-                                }
-                                else if (shipCommandsMaster.command == "targetEnemy")
-                                {
-                                    Console.BackgroundColor = ConsoleColor.DarkGreen;
-                                    Console.WriteLine("targetEnemy");
-                                    Console.ResetColor();
-                                    Task.Run(() => targetEnemy());
-                                }
-                                else if (shipCommandsMaster.command == "screenshot")
-                                {
-                                    Console.BackgroundColor = ConsoleColor.DarkGreen;
-                                    Console.WriteLine("screenshot");
-                                    Console.ResetColor();
-                                    Task.Run(() => screenshot());
-                                }
-                                else if (shipCommandsMaster.command == "launch")
-                                {
-                                    Console.BackgroundColor = ConsoleColor.DarkGreen;
-                                    Console.WriteLine("launch");
-                                    Console.ResetColor();
-                                    Task.Run(() => launch());
-                                }
-                                else if (shipCommandsMaster.command == "lightsOff")
-                                {
-                                    Console.BackgroundColor = ConsoleColor.DarkGreen;
-                                    Console.WriteLine("lightsOff");
-                                    Console.ResetColor();
-                                    Task.Run(() => lightsOff());
-                                }
-                                else if (shipCommandsMaster.command == "lightsOn")
-                                {
-                                    Console.BackgroundColor = ConsoleColor.DarkGreen;
-                                    Console.WriteLine("lightsOn");
-                                    Console.ResetColor();
-                                    Task.Run(() => lightsOn());
-                                }
-                                else if (shipCommandsMaster.command == "enginesForward100")
-                                {
-                                    Console.BackgroundColor = ConsoleColor.DarkGreen;
-                                    Console.WriteLine("enginesForward100");
-                                    Console.ResetColor();
-                                    Task.Run(() => enginesForward100());
-                                }
-                                else if (shipCommandsMaster.command == "enginesForward90")
-                                {
-                                    Console.BackgroundColor = ConsoleColor.DarkGreen;
-                                    Console.WriteLine("enginesForward90");
-                                    Console.ResetColor();
-                                    Task.Run(() => enginesForward90());
-                                }
-                                else if (shipCommandsMaster.command == "enginesForward80")
-                                {
-                                    Console.BackgroundColor = ConsoleColor.DarkGreen;
-                                    Console.WriteLine("enginesForward80");
-                                    Console.ResetColor();
-                                    Task.Run(() => enginesForward80());
-                                }
-                                else if (shipCommandsMaster.command == "enginesForward75")
-                                {
-                                    Console.BackgroundColor = ConsoleColor.DarkGreen;
-                                    Console.WriteLine("enginesForward75");
-                                    Console.ResetColor();
-                                    Task.Run(() => enginesForward75());
-                                }
-                                else if (shipCommandsMaster.command == "enginesForward70")
-                                {
-                                    Console.BackgroundColor = ConsoleColor.DarkGreen;
-                                    Console.WriteLine("enginesForward70");
-                                    Console.ResetColor();
-                                    Task.Run(() => enginesForward70());
-                                }
-                                else if (shipCommandsMaster.command == "enginesForward60")
-                                {
-                                    Console.BackgroundColor = ConsoleColor.DarkGreen;
-                                    Console.WriteLine("enginesForward60");
-                                    Console.ResetColor();
-                                    Task.Run(() => enginesForward60());
-                                }
-                                else if (shipCommandsMaster.command == "enginesForward50")
-                                {
-                                    Console.BackgroundColor = ConsoleColor.DarkGreen;
-                                    Console.WriteLine("enginesForward50");
-                                    Console.ResetColor();
-                                    Task.Run(() => enginesForward50());
-                                }
-                                else if (shipCommandsMaster.command == "enginesForward40")
-                                {
-                                    Console.BackgroundColor = ConsoleColor.DarkGreen;
-                                    Console.WriteLine("enginesForward40");
-                                    Console.ResetColor();
-                                    Task.Run(() => enginesForward40());
-                                }
-                                else if (shipCommandsMaster.command == "enginesForward30")
-                                {
-                                    Console.BackgroundColor = ConsoleColor.DarkGreen;
-                                    Console.WriteLine("enginesForward30");
-                                    Console.ResetColor();
-                                    Task.Run(() => enginesForward30());
-                                }
-                                else if (shipCommandsMaster.command == "enginesForward25")
-                                {
-                                    Console.BackgroundColor = ConsoleColor.DarkGreen;
-                                    Console.WriteLine("enginesForward25");
-                                    Console.ResetColor();
-                                    Task.Run(() => enginesForward25());
-                                }
-                                else if (shipCommandsMaster.command == "enginesForward20")
-                                {
-                                    Console.BackgroundColor = ConsoleColor.DarkGreen;
-                                    Console.WriteLine("enginesForward20");
-                                    Console.ResetColor();
-                                    Task.Run(() => enginesForward20());
-                                }
-                                else if (shipCommandsMaster.command == "enginesForward10")
-                                {
-                                    Console.BackgroundColor = ConsoleColor.DarkGreen;
-                                    Console.WriteLine("enginesForward10");
-                                    Console.ResetColor();
-                                    Task.Run(() => enginesForward10());
-                                }
-                                else if (shipCommandsMaster.command == "nextFireGroup")
-                                {
-                                    Console.BackgroundColor = ConsoleColor.DarkGreen;
-                                    Console.WriteLine("nextFireGroup");
-                                    Console.ResetColor();
-                                    Task.Run(() => nextFireGroup());
-                                }
-                                else if (shipCommandsMaster.command == "nextFireGroup")
-                                {
-                                    Console.BackgroundColor = ConsoleColor.DarkGreen;
-                                    Console.WriteLine("nextFireGroup");
-                                    Console.ResetColor();
-                                    Task.Run(() => nextFireGroup());
-                                }
-                                else if (shipCommandsMaster.command == "nextHostile")
-                                {
-                                    Console.BackgroundColor = ConsoleColor.DarkGreen;
-                                    Console.WriteLine("nextHostile");
-                                    Console.ResetColor();
-                                    Task.Run(() => nextHostile());
-                                }
-                                else if (shipCommandsMaster.command == "nextSystem")
-                                {
-                                    Console.BackgroundColor = ConsoleColor.DarkGreen;
-                                    Console.WriteLine("nextSystem");
-                                    Console.ResetColor();
-                                    Task.Run(() => nextSystem());
-                                }
-                                else if (shipCommandsMaster.command == "nextShip")
-                                {
-                                    Console.BackgroundColor = ConsoleColor.DarkGreen;
-                                    Console.WriteLine("nextShip");
-                                    Console.ResetColor();
-                                    Task.Run(() => nextShip());
-                                }
-                                else if (shipCommandsMaster.command == "prevFireGroup")
-                                {
-                                    Console.BackgroundColor = ConsoleColor.DarkGreen;
-                                    Console.WriteLine("prevFireGroup");
-                                    Console.ResetColor();
-                                    Task.Run(() => prevFireGroup());
-                                }
-                                else if (shipCommandsMaster.command == "prevHostile")
-                                {
-                                    Console.BackgroundColor = ConsoleColor.DarkGreen;
-                                    Console.WriteLine("prevHostile");
-                                    Console.ResetColor();
-                                    Task.Run(() => prevHostile());
-                                }
-                                else if (shipCommandsMaster.command == "prevShip")
-                                {
-                                    Console.BackgroundColor = ConsoleColor.DarkGreen;
-                                    Console.WriteLine("prevShip");
-                                    Console.ResetColor();
-                                    Task.Run(() => prevShip());
-                                }
-                                else if (shipCommandsMaster.command == "requestDocking")
-                                {
-                                    Console.BackgroundColor = ConsoleColor.DarkGreen;
-                                    Console.WriteLine("requestDocking");
-                                    Console.ResetColor();
-                                    Task.Run(() => requestDocking());
-                                }
-                                else if (shipCommandsMaster.command == "centerHeadset")
-                                {
-                                    Console.BackgroundColor = ConsoleColor.DarkGreen;
-                                    Console.WriteLine("centerHeadset");
-                                    Console.ResetColor();
-                                    Task.Run(() => centerHeadset());
-                                }
-                                else if (shipCommandsMaster.command == "retractHardpoints")
-                                {
-                                    Console.BackgroundColor = ConsoleColor.DarkGreen;
-                                    Console.WriteLine("retractHardpoints");
-                                    Console.ResetColor();
-                                    Task.Run(() => retractHardpoints());
-                                }
-                                else if (shipCommandsMaster.command == "retractLandingGear")
-                                {
-                                    Console.BackgroundColor = ConsoleColor.DarkGreen;
-                                    Console.WriteLine("retractLandingGear");
-                                    Console.ResetColor();
-                                    Task.Run(() => retractLandingGear());
-                                }
-                                else if (shipCommandsMaster.command == "retractCargoScoop")
-                                {
-                                    Console.BackgroundColor = ConsoleColor.DarkGreen;
-                                    Console.WriteLine("retractCargoScoop");
-                                    Console.ResetColor();
-                                    Task.Run(() => retractCargoScoop());
-                                }
-                                else if (shipCommandsMaster.command == "enginesBack100")
-                                {
-                                    Console.BackgroundColor = ConsoleColor.DarkGreen;
-                                    Console.WriteLine("enginesBack100");
-                                    Console.ResetColor();
-                                    Task.Run(() => enginesBack100());
-                                }
-                                else if (shipCommandsMaster.command == "enginesBack75")
-                                {
-                                    Console.BackgroundColor = ConsoleColor.DarkGreen;
-                                    Console.WriteLine("enginesBack75");
-                                    Console.ResetColor();
-                                    Task.Run(() => enginesBack75());
-                                }
-                                else if (shipCommandsMaster.command == "enginesBack50")
-                                {
-                                    Console.BackgroundColor = ConsoleColor.DarkGreen;
-                                    Console.WriteLine("enginesBack50");
-                                    Console.ResetColor();
-                                    Task.Run(() => enginesBack50());
-                                }
-                                else if (shipCommandsMaster.command == "enginesBack25")
-                                {
-                                    Console.BackgroundColor = ConsoleColor.DarkGreen;
-                                    Console.WriteLine("enginesBack25");
-                                    Console.ResetColor();
-                                    Task.Run(() => enginesBack25());
-                                }
-                                else if (shipCommandsMaster.command == "SRVRecovery")
-                                {
-                                    Console.BackgroundColor = ConsoleColor.DarkGreen;
-                                    Console.WriteLine("SRVRecovery");
-                                    Console.ResetColor();
-                                    Task.Run(() => SRVRecovery());
-                                }
-                                else if (shipCommandsMaster.command == "cutEngines")
-                                {
-                                    Console.BackgroundColor = ConsoleColor.DarkGreen;
-                                    Console.WriteLine("cutEngines");
-                                    Console.ResetColor();
-                                    Task.Run(() => cutEngines());
-                                }
-                            }
-                            test = 0;
-                        }
-
-                        if (commandName == "timetoken")
-                        {
-                            test = 2;
-                        }
-
-                        if (test == 1)
-                        {
-                            shipCommandsMaster.command = commandName;
-                            
-                        }
-
-                        if (commandName == "command")
-                        {
-
-                            test = 1;
-                        }
-
-                        if (reader.Value != null)
-                        {
-
-                        }
+                    }
+                    else if (command == "{\"command\":\"deployChaff\"}")
+                    {
+                        Console.BackgroundColor = ConsoleColor.DarkGreen;
+                        Console.WriteLine("deployChaff");
+                        Console.ResetColor();
+                        Task.Run(() => deployChaff());
+                    }
+                    else if (command == "{\"command\":\"deployHardpoints\"}")
+                    {
+                        Console.BackgroundColor = ConsoleColor.DarkGreen;
+                        Console.WriteLine("deployHardpoints");
+                        Console.ResetColor();
+                        Task.Run(() => deployHardpoints());
+                    }
+                    else if (command == "{\"command\":\"deployLandingGear\"}")
+                    {
+                        Console.BackgroundColor = ConsoleColor.DarkGreen;
+                        Console.WriteLine("deployLandingGear");
+                        Console.ResetColor();
+                        Task.Run(() => deployLandingGear());
+                    }
+                    else if (command == "{\"command\":\"deployCargoScoop\"}")
+                    {
+                        Console.BackgroundColor = ConsoleColor.DarkGreen;
+                        Console.WriteLine("deployCargoScoop");
+                        Console.ResetColor();
+                        Task.Run(() => deployCargoScoop());
+                    }
+                    else if (command == "{\"command\":\"deploySRV\"}")
+                    {
+                        Console.BackgroundColor = ConsoleColor.DarkGreen;
+                        Console.WriteLine("deploySRV");
+                        Console.ResetColor();
+                        Task.Run(() => deploySRV());
+                    }
+                    else if (command == "{\"command\":\"exitFramshift\"}")
+                    {
+                        Console.BackgroundColor = ConsoleColor.DarkGreen;
+                        Console.WriteLine("exitFramshift");
+                        Console.ResetColor();
+                        Task.Run(() => exitFramshift());
+                    }
+                    else if (command == "{\"command\":\"exitCruise\"}")
+                    {
+                        Console.BackgroundColor = ConsoleColor.DarkGreen;
+                        Console.WriteLine("exitCruise");
+                        Console.ResetColor();
+                        Task.Run(() => exitCruise());
+                    }
+                    else if (command == "{\"command\":\"powerToEngines\"}")
+                    {
+                        Console.BackgroundColor = ConsoleColor.DarkGreen;
+                        Console.WriteLine("powerToEngines");
+                        Console.ResetColor();
+                        Task.Run(() => powerToEngines());
+                    }
+                    else if (command == "{\"command\":\"powerToSystems\"}")
+                    {
+                        Console.BackgroundColor = ConsoleColor.DarkGreen;
+                        Console.WriteLine("powerToSystems");
+                        Console.ResetColor();
+                        Task.Run(() => powerToSystems());
+                    }
+                    else if (command == "{\"command\":\"powerToWeapons\"}")
+                    {
+                        Console.BackgroundColor = ConsoleColor.DarkGreen;
+                        Console.WriteLine("powerToWeapons");
+                        Console.ResetColor();
+                        Task.Run(() => powerToWeapons());
+                    }
+                    else if (command == "{\"command\":\"emergencyStop\"}")
+                    {
+                        Console.BackgroundColor = ConsoleColor.DarkGreen;
+                        Console.WriteLine("emergencyStop");
+                        Console.ResetColor();
+                        Task.Run(() => emergencyStop());
+                    }
+                    else if (command == "{\"command\":\"engageFrameshift\"}")
+                    {
+                        Console.BackgroundColor = ConsoleColor.DarkGreen;
+                        Console.WriteLine("engageFrameshift");
+                        Console.ResetColor();
+                        Task.Run(() => engageFrameshift());
+                    }
+                    else if (command == "{\"command\":\"engageCruise\"}")
+                    {
+                        Console.BackgroundColor = ConsoleColor.DarkGreen;
+                        Console.WriteLine("engageCruise");
+                        Console.ResetColor();
+                        Task.Run(() => engageCruise());
+                    }
+                    else if (command == "{\"command\":\"fightAssistOff\"}")
+                    {
+                        Console.BackgroundColor = ConsoleColor.DarkGreen;
+                        Console.WriteLine("fightAssistOff");
+                        Console.ResetColor();
+                        Task.Run(() => fightAssistOff());
+                    }
+                    else if (command == "{\"command\":\"fightAssistOn\"}")
+                    {
+                        Console.BackgroundColor = ConsoleColor.DarkGreen;
+                        Console.WriteLine("fightAssistOn");
+                        Console.ResetColor();
+                        Task.Run(() => fightAssistOn());
+                    }
+                    else if (command == "{\"command\":\"targetEnemy\"}")
+                    {
+                        Console.BackgroundColor = ConsoleColor.DarkGreen;
+                        Console.WriteLine("targetEnemy");
+                        Console.ResetColor();
+                        Task.Run(() => targetEnemy());
+                    }
+                    else if (command == "{\"command\":\"screenshot\"}")
+                    {
+                        Console.BackgroundColor = ConsoleColor.DarkGreen;
+                        Console.WriteLine("screenshot");
+                        Console.ResetColor();
+                        Task.Run(() => screenshot());
+                    }
+                    else if (command == "{\"command\":\"launch\"}")
+                    {
+                        Console.BackgroundColor = ConsoleColor.DarkGreen;
+                        Console.WriteLine("launch");
+                        Console.ResetColor();
+                        Task.Run(() => launch());
+                    }
+                    else if (command == "{\"command\":\"lightsOff\"}")
+                    {
+                        Console.BackgroundColor = ConsoleColor.DarkGreen;
+                        Console.WriteLine("lightsOff");
+                        Console.ResetColor();
+                        Task.Run(() => lightsOff());
+                    }
+                    else if (command == "{\"command\":\"lightsOn\"}")
+                    {
+                        Console.BackgroundColor = ConsoleColor.DarkGreen;
+                        Console.WriteLine("lightsOn");
+                        Console.ResetColor();
+                        Task.Run(() => lightsOn());
+                    }
+                    else if (command == "{\"command\":\"enginesForward100\"}")
+                    {
+                        Console.BackgroundColor = ConsoleColor.DarkGreen;
+                        Console.WriteLine("enginesForward100");
+                        Console.ResetColor();
+                        Task.Run(() => enginesForward100());
+                    }
+                    else if (command == "{\"command\":\"enginesForward90\"}")
+                    {
+                        Console.BackgroundColor = ConsoleColor.DarkGreen;
+                        Console.WriteLine("enginesForward90");
+                        Console.ResetColor();
+                        Task.Run(() => enginesForward90());
+                    }
+                    else if (command == "{\"command\":\"enginesForward80\"}")
+                    {
+                        Console.BackgroundColor = ConsoleColor.DarkGreen;
+                        Console.WriteLine("enginesForward80\"}");
+                        Console.ResetColor();
+                        Task.Run(() => enginesForward80());
+                    }
+                    else if (command == "{\"command\":\"enginesForward75\"}")
+                    {
+                        Console.BackgroundColor = ConsoleColor.DarkGreen;
+                        Console.WriteLine("enginesForward75");
+                        Console.ResetColor();
+                        Task.Run(() => enginesForward75());
+                    }
+                    else if (command == "{\"command\":\"enginesForward70\"}")
+                    {
+                        Console.BackgroundColor = ConsoleColor.DarkGreen;
+                        Console.WriteLine("enginesForward70");
+                        Console.ResetColor();
+                        Task.Run(() => enginesForward70());
+                    }
+                    else if (command == "{\"command\":\"enginesForward60\"}")
+                    {
+                        Console.BackgroundColor = ConsoleColor.DarkGreen;
+                        Console.WriteLine("enginesForward60");
+                        Console.ResetColor();
+                        Task.Run(() => enginesForward60());
+                    }
+                    else if (command == "{\"command\":\"enginesForward50\"}")
+                    {
+                        Console.BackgroundColor = ConsoleColor.DarkGreen;
+                        Console.WriteLine("enginesForward50");
+                        Console.ResetColor();
+                        Task.Run(() => enginesForward50());
+                    }
+                    else if (command == "{\"command\":\"enginesForward40\"}")
+                    {
+                        Console.BackgroundColor = ConsoleColor.DarkGreen;
+                        Console.WriteLine("enginesForward40");
+                        Console.ResetColor();
+                        Task.Run(() => enginesForward40());
+                    }
+                    else if (command == "{\"command\":\"enginesForward30\"}")
+                    {
+                        Console.BackgroundColor = ConsoleColor.DarkGreen;
+                        Console.WriteLine("enginesForward30");
+                        Console.ResetColor();
+                        Task.Run(() => enginesForward30());
+                    }
+                    else if (command == "{\"command\":\"enginesForward25\"}")
+                    {
+                        Console.BackgroundColor = ConsoleColor.DarkGreen;
+                        Console.WriteLine("enginesForward25");
+                        Console.ResetColor();
+                        Task.Run(() => enginesForward25());
+                    }
+                    else if (command == "{\"command\":\"enginesForward20\"}")
+                    {
+                        Console.BackgroundColor = ConsoleColor.DarkGreen;
+                        Console.WriteLine("enginesForward20");
+                        Console.ResetColor();
+                        Task.Run(() => enginesForward20());
+                    }
+                    else if (command == "{\"command\":\"enginesForward10\"}")
+                    {
+                        Console.BackgroundColor = ConsoleColor.DarkGreen;
+                        Console.WriteLine("enginesForward10");
+                        Console.ResetColor();
+                        Task.Run(() => enginesForward10());
+                    }
+                    else if (command == "{\"command\":\"nextFireGroup\"}")
+                    {
+                        Console.BackgroundColor = ConsoleColor.DarkGreen;
+                        Console.WriteLine("nextFireGroup");
+                        Console.ResetColor();
+                        Task.Run(() => nextFireGroup());
+                    }
+                    else if (command == "{\"command\":\"nextFireGroup\"}")
+                    {
+                        Console.BackgroundColor = ConsoleColor.DarkGreen;
+                        Console.WriteLine("nextFireGroup");
+                        Console.ResetColor();
+                        Task.Run(() => nextFireGroup());
+                    }
+                    else if (command == "{\"command\":\"nextHostile\"}")
+                    {
+                        Console.BackgroundColor = ConsoleColor.DarkGreen;
+                        Console.WriteLine("nextHostile");
+                        Console.ResetColor();
+                        Task.Run(() => nextHostile());
+                    }
+                    else if (command == "{\"command\":\"nextSystem\"}")
+                    {
+                        Console.BackgroundColor = ConsoleColor.DarkGreen;
+                        Console.WriteLine("nextSystem");
+                        Console.ResetColor();
+                        Task.Run(() => nextSystem());
+                    }
+                    else if (command == "{\"command\":\"nextShip\"}")
+                    {
+                        Console.BackgroundColor = ConsoleColor.DarkGreen;
+                        Console.WriteLine("nextShip");
+                        Console.ResetColor();
+                        Task.Run(() => nextShip());
+                    }
+                    else if (command == "{\"command\":\"prevFireGroup\"}")
+                    {
+                        Console.BackgroundColor = ConsoleColor.DarkGreen;
+                        Console.WriteLine("prevFireGroup");
+                        Console.ResetColor();
+                        Task.Run(() => prevFireGroup());
+                    }
+                    else if (command == "{\"command\":\"prevHostile\"}")
+                    {
+                        Console.BackgroundColor = ConsoleColor.DarkGreen;
+                        Console.WriteLine("prevHostile");
+                        Console.ResetColor();
+                        Task.Run(() => prevHostile());
+                    }
+                    else if (command == "{\"command\":\"prevShip\"}")
+                    {
+                        Console.BackgroundColor = ConsoleColor.DarkGreen;
+                        Console.WriteLine("prevShip");
+                        Console.ResetColor();
+                        Task.Run(() => prevShip());
+                    }
+                    else if (command == "{\"command\":\"requestDocking\"}")
+                    {
+                        Console.BackgroundColor = ConsoleColor.DarkGreen;
+                        Console.WriteLine("requestDocking");
+                        Console.ResetColor();
+                        Task.Run(() => requestDocking());
+                    }
+                    else if (command == "{\"command\":\"centerHeadset\"}")
+                    {
+                        Console.BackgroundColor = ConsoleColor.DarkGreen;
+                        Console.WriteLine("centerHeadset");
+                        Console.ResetColor();
+                        Task.Run(() => centerHeadset());
+                    }
+                    else if (command == "{\"command\":\"retractHardpoints\"}")
+                    {
+                        Console.BackgroundColor = ConsoleColor.DarkGreen;
+                        Console.WriteLine("retractHardpoints");
+                        Console.ResetColor();
+                        Task.Run(() => retractHardpoints());
+                    }
+                    else if (command == "{\"command\":\"retractLandingGear\"}")
+                    {
+                        Console.BackgroundColor = ConsoleColor.DarkGreen;
+                        Console.WriteLine("retractLandingGear");
+                        Console.ResetColor();
+                        Task.Run(() => retractLandingGear());
+                    }
+                    else if (command == "{\"command\":\"retractCargoScoop\"}")
+                    {
+                        Console.BackgroundColor = ConsoleColor.DarkGreen;
+                        Console.WriteLine("retractCargoScoop\"}");
+                        Console.ResetColor();
+                        Task.Run(() => retractCargoScoop());
+                    }
+                    else if (command == "{\"command\":\"enginesBack100\"}")
+                    {
+                        Console.BackgroundColor = ConsoleColor.DarkGreen;
+                        Console.WriteLine("enginesBack100");
+                        Console.ResetColor();
+                        Task.Run(() => enginesBack100());
+                    }
+                    else if (command == "{\"command\":\"enginesBack75\"}")
+                    {
+                        Console.BackgroundColor = ConsoleColor.DarkGreen;
+                        Console.WriteLine("enginesBack75");
+                        Console.ResetColor();
+                        Task.Run(() => enginesBack75());
+                    }
+                    else if (command == "{\"command\":\"enginesBack50\"}")
+                    {
+                        Console.BackgroundColor = ConsoleColor.DarkGreen;
+                        Console.WriteLine("enginesBack50");
+                        Console.ResetColor();
+                        Task.Run(() => enginesBack50());
+                    }
+                    else if (command == "{\"command\":\"enginesBack25\"}")
+                    {
+                        Console.BackgroundColor = ConsoleColor.DarkGreen;
+                        Console.WriteLine("enginesBack25");
+                        Console.ResetColor();
+                        Task.Run(() => enginesBack25());
+                    }
+                    else if (command == "{\"command\":\"SRVRecovery\"}")
+                    {
+                        Console.BackgroundColor = ConsoleColor.DarkGreen;
+                        Console.WriteLine("SRVRecovery");
+                        Console.ResetColor();
+                        Task.Run(() => SRVRecovery());
+                    }
+                    else if (command == "{\"command\":\"cutEngines\"}")
+                    {
+                        Console.BackgroundColor = ConsoleColor.DarkGreen;
+                        Console.WriteLine("cutEngines");
+                        Console.ResetColor();
+                        Task.Run(() => cutEngines());
                     }
                 }
             }
         }
+        
+                            
     } // When new command is found, assosiate it to a function
     public static void boost()
     {
@@ -2034,5 +1999,15 @@ public class Program
             return _reader.ReadLine();
         }
     } //Checks for added content 
+
+    public static void DisplaySubscribeConnectStatusMessage(string result)
+    {
+
+    }
+
+    public static void DisplayErrorMessage(PubnubClientError pubnubError)
+    {
+
+    }
 
 }
