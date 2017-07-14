@@ -196,7 +196,7 @@ public class Program
         Console.WriteLine("|______|_____/  |_____/|_| |_|_| .__/  /_/    \\_\\___/___/_|___/\\__\\__,_|_| |_|\\__|");
         Console.WriteLine("                               | |                                                 ");
         Console.WriteLine("                               |_|                                                ");
-
+        
         Console.WriteLine();
 
         Console.Write("Please enter your session ID: ");
